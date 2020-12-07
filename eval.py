@@ -7,7 +7,7 @@ import json
 import cv2 as cv
 import numpy as np
 from tqdm import tqdm
-from nets.retinanet import RetinaNet
+from nets.retinanet import GFocal
 from datasets.coco import coco_ids, rgb_mean, rgb_std
 from utils.augmentations import RandScaleToMax
 from utils.model_utils import AverageLogger
@@ -27,12 +27,12 @@ def coco_eavl(anno_path="/home/huffman/data/annotations/instances_val2017.json",
 
 
 @torch.no_grad()
-def eval_model(weight_path="weights/atss_retina_resnet50_last.pth", device="cuda:5"):
+def eval_model(weight_path="weights/gfocal_resnet50_last.pth", device="cuda:5"):
     from pycocotools.coco import COCO
     device = torch.device(device)
     with open("config/gfocal.yaml", 'r') as rf:
         cfg = yaml.safe_load(rf)
-    net = RetinaNet(**{**cfg['model'], 'pretrained': False, "nms_iou_thresh": 0.6})
+    net = GFocal(**{**cfg['model'], 'pretrained': False, "nms_iou_thresh": 0.6})
     net.load_state_dict(torch.load(weight_path, map_location="cpu")['ema'])
     net.to(device)
     net.eval().half()
@@ -76,3 +76,15 @@ def eval_model(weight_path="weights/atss_retina_resnet50_last.pth", device="cuda
 
 if __name__ == '__main__':
     eval_model()
+# Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.398
+# Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.593
+# Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.426
+# Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.213
+# Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.439
+# Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.553
+# Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.319
+# Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.507
+# Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.549
+# Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.344
+# Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.606
+# Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.701

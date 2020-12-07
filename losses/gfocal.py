@@ -212,6 +212,6 @@ class GFocalLoss(object):
         match_norm_ltrb_box = box2distance(norm_anchor_center, match_norm_box_targets).clamp(min=0,
                                                                                              max=self.reg_max - 0.1)
         loss_dfl = (self.dfl(match_reg_pred, match_norm_ltrb_box) *
-                    cls_scores[:, None].expand(-1, 4).reshape(-1)).sum() / (4.0 * division_factor)
+                    cls_scores[:, None].expand(-1, 4).reshape(-1)).sum() / division_factor
 
         return loss_qfl, self.iou_loss_weight * loss_iou, self.reg_loss_weight * loss_dfl, num_pos
