@@ -27,15 +27,26 @@ def box2distance(points, bbox):
     return torch.stack([l, t, r, b], -1)
 
 
+def binary_cross_entropy(predicts, targets, eps=1e-8):
+    """
+    :param eps:
+    :param predicts:
+    :param targets:
+    :return:
+    """
+    ret = targets * (predicts.clamp(min=eps).log()) + (1 - targets) * ((1 - predicts).clamp(min=eps).log())
+    return -ret
+
+
 class QFL(object):
     def __init__(self, beta=2.0):
         super(QFL, self).__init__()
         self.beta = beta
         # self.bce = torch.nn.BCEWithLogitsLoss(reduction="none")
-        self.bce = torch.nn.BCELoss(reduction="none")
+        # self.bce = torch.nn.BCELoss(reduction="none")
 
     def __call__(self, predicts, targets):
-        loss = self.bce(predicts, targets) * ((targets - predicts).abs().pow(self.beta))
+        loss = binary_cross_entropy(predicts, targets) * ((targets - predicts).abs().pow(self.beta))
         return loss
 
 
@@ -198,7 +209,7 @@ class GFocalLoss(object):
 
         cls_targets = torch.zeros_like(cls_predicts)
         cls_targets[cls_batch_idx, cls_anchor_idx, cls_label_idx] = iou_scores
-        cls_scores = cls_predicts[cls_batch_idx, cls_anchor_idx].sigmoid().max(dim=-1)[0].detach()
+        cls_scores = cls_predicts[cls_batch_idx, cls_anchor_idx].max(dim=-1)[0].detach()
 
         division_factor = cls_scores.sum()
 
