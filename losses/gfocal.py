@@ -31,11 +31,11 @@ class QFL(object):
     def __init__(self, beta=2.0):
         super(QFL, self).__init__()
         self.beta = beta
-        self.bce = torch.nn.BCEWithLogitsLoss(reduction="none")
+        # self.bce = torch.nn.BCEWithLogitsLoss(reduction="none")
+        self.bce = torch.nn.BCELoss(reduction="none")
 
     def __call__(self, predicts, targets):
-        pt = predicts.sigmoid()
-        loss = self.bce(predicts, targets) * ((targets - pt).abs().pow(self.beta))
+        loss = self.bce(predicts, targets) * ((targets - predicts).abs().pow(self.beta))
         return loss
 
 
@@ -180,10 +180,6 @@ class GFocalLoss(object):
             match_anchor_idx.append(anchor_idx)
             match_gt_idx.append(match[anchor_idx])
             match_bidx.append(bid)
-        if cls_predicts.dtype == torch.float16:
-            cls_predicts = cls_predicts.float()
-        if reg_predicts.dtype == torch.float16:
-            reg_predicts = reg_predicts.float()
         cls_batch_idx = sum([[i] * len(j) for i, j in zip(match_bidx, match_anchor_idx)], [])
         cls_anchor_idx = torch.cat(match_anchor_idx)
         cls_label_idx = torch.cat([gt_boxes[i][:, 0][j].long() for i, j in zip(match_bidx, match_gt_idx)])

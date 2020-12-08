@@ -139,6 +139,44 @@ class GFocalRegHead(nn.Module):
         return x
 
 
+class SubNetFC(nn.Module):
+    def __init__(self, m_top_k=4, inner_channel=64, add_mean=True):
+        super(SubNetFC, self).__init__()
+        self.m_top_k = m_top_k
+        self.add_mean = add_mean
+        total_dim = (m_top_k + 1) * 4 if add_mean else m_top_k * 4
+        self.reg_conf = nn.Sequential(
+            nn.Linear(total_dim, inner_channel),
+            nn.ReLU(inplace=True),
+            nn.Linear(inner_channel, 1)
+        )
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, std=0.01)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+
+    def forward(self, x):
+        """
+        :param x: [bs, all, 4*(reg_max+1)]
+        :return:
+        """
+        bs, n, c = x.shape
+        x = x.view(bs, n, 4, -1)
+        origin_type = x.dtype
+        if x.dtype == torch.float16:
+            x = x.float()
+        prob_topk, _ = x.softmax(-1).topk(self.m_top_k, dim=-1)
+        if self.add_mean:
+            stat = torch.cat([prob_topk, prob_topk.mean(dim=-1, keepdim=True)], dim=-1)
+        else:
+            stat = prob_topk
+        if stat.dtype != origin_type:
+            stat = stat.to(origin_type)
+        quality_score = self.reg_conf(stat.reshape(bs, n, -1))
+        return quality_score
+
+
 class GFocalHead(nn.Module):
     def __init__(self, in_channel,
                  inner_channel,
@@ -146,6 +184,9 @@ class GFocalHead(nn.Module):
                  anchor_scales,
                  anchor_ratios,
                  strides,
+                 subnet_dim=64,
+                 m_top_k=4,
+                 add_mean=True,
                  num_cls=80,
                  num_convs=4,
                  layer_num=5,
@@ -171,7 +212,7 @@ class GFocalHead(nn.Module):
                                      num=num_convs, block_type=block_type)
         self.cls_head = GFocalClsHead(inner_channel, self.anchor_nums, num_cls)
         self.reg_head = GFocalRegHead(inner_channel, self.anchor_nums, reg_max=reg_max)
-
+        self.reg_conf = SubNetFC(m_top_k=m_top_k, inner_channel=subnet_dim, add_mean=add_mean)
         self.project = Project(reg_max)
 
     def build_anchors_delta(self, size=32.):
@@ -214,8 +255,18 @@ class GFocalHead(nn.Module):
         for j, x in enumerate(xs):
             cls_tower = self.cls_bones(x)
             reg_tower = self.reg_bones(x)
-            cls_outputs.append(self.cls_head(cls_tower))
-            reg_outputs.append(self.scales[j](self.reg_head(reg_tower)))
+            cls_feat = self.cls_head(cls_tower)
+            reg_feat = self.scales[j](self.reg_head(reg_tower))
+            reg_score = self.reg_conf(reg_feat)
+            if cls_feat.dtype == torch.float16:
+                cls_feat = cls_feat.float()
+            if reg_score.dtype == torch.float16:
+                reg_score = reg_score.float()
+            if reg_feat.dtype == torch.float16:
+                reg_feat = reg_feat.float()
+            cls_score = cls_feat.sigmoid() * reg_score.sigmoid()
+            cls_outputs.append(cls_score)
+            reg_outputs.append(reg_feat)
         if self.anchors[0] is None or self.anchors[0].shape[0] != cls_outputs[0].shape[1]:
             with torch.no_grad():
                 anchors = self.build_anchors(xs)
@@ -227,16 +278,12 @@ class GFocalHead(nn.Module):
         else:
             predicts_list = list()
             for cls_out, reg_out, stride, anchor in zip(cls_outputs, reg_outputs, self.strides, self.anchors):
-                if cls_out.dtype == torch.float16:
-                    cls_out = cls_out.float()
-                if reg_out.dtype == torch.float16:
-                    reg_out = reg_out.float()
                 reg_out = self.project(reg_out) * stride
                 anchor_center = ((anchor[:, :2] + anchor[:, 2:]) * 0.5)[None, ...]
                 x1y1 = anchor_center - reg_out[..., :2]
                 x2y2 = anchor_center + reg_out[..., 2:]
                 box_xyxy = torch.cat([x1y1, x2y2], dim=-1)
-                predicts_out = torch.cat([box_xyxy, cls_out.sigmoid()], dim=-1)
+                predicts_out = torch.cat([box_xyxy, cls_out], dim=-1)
                 predicts_list.append(predicts_out)
             return predicts_list
 
@@ -253,6 +300,9 @@ default_cfg = {
     "head_conv_num": 4,
     "block_type": "CGR",
     "reg_max": 16,
+    "m_top_k": 4,
+    "subnet_dim": 64,
+    "add_mean": True,
     # loss
     "top_k": 9,
     "iou_loss_weight": 2.0,
@@ -284,7 +334,11 @@ class GFocal(nn.Module):
                                anchor_ratios=self.cfg['anchor_ratios'],
                                strides=self.cfg['strides'],
                                block_type=self.cfg['block_type'],
-                               reg_max=self.cfg['reg_max'])
+                               reg_max=self.cfg['reg_max'],
+                               subnet_dim=self.cfg['subnet_dim'],
+                               m_top_k=self.cfg['m_top_k'],
+                               add_mean=self.cfg['add_mean']
+                               )
         self.loss = GFocalLoss(
             strides=self.cfg['strides'],
             top_k=self.cfg['top_k'],
