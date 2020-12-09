@@ -1,5 +1,5 @@
 # GFocal
-This is an unofficial pytorch implementation of GFocal(retina) object detection as described in [Generalized Focal Loss: Learning Qualified and Distributed Bounding Boxes for Dense Object Detection](https://arxiv.org/pdf/2006.04388.pdf) by Li, Xiang and Wang, Wenhai and Wu, Lijun and Chen, Shuo and Hu, Xiaolin and Li, Jun and Tang, Jinhui and Yang, Jian
+This is an unofficial pytorch implementation of GFocalV2 object detection as described in [Generalized Focal Loss V2: Learning Reliable Localization Quality Estimation for Dense Object Detection](https://arxiv.org/pdf/2011.12885.pdf) by Li, Xiang Li, Wenhai Wang, Xiaolin Hu, Jun Li, Jinhui Tang, and Jian Yang
 
 ## requirement
 ```text
@@ -13,20 +13,20 @@ torchvision >=0.6.0
 ```
 ## result
 we trained this repo on 4 GPUs with batch size 32(8 image per node).the total epoch is 24(about 180k iter),Adam with cosine lr decay is used for optimizing.
-finally, this repo achieves 40.6 mAp at 640px(max side) resolution with resnet50 backbone.(about 44.05fps)
+finally, this repo achieves 40.8 mAp at 640px(max side) resolution with resnet50 backbone.(about 41.90fps)
 ```shell script
- Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.406
- Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.600
- Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.437
- Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.219
- Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.444
- Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.568
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.323
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.510
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.551
- Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.346
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.607
- Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.707
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.408
+ Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.598
+ Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.442
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.223
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.448
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.561
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.325
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.513
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.553
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.351
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.608
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.706
 
 
 ```
@@ -79,7 +79,7 @@ model:
   iou_loss_weight: 2.0
   reg_loss_weight: 0.25
   conf_thresh: 0.05
-  nms_iou_thresh: 0.5
+  nms_iou_thresh: 0.6
   max_det: 300
 
 optim:
@@ -122,12 +122,12 @@ nohup python -m torch.distributed.launch --nproc_per_node=4 main.py >>train.log 
 - [ ] MobileNet Backbone support
 
 ## Reference
+official implement [GFocalV2](https://github.com/implus/GFocalV2)
 ```text
-@inproceedings{li2020generalized,
-  title={Generalized Focal Loss: Learning Qualified and Distributed Bounding Boxes for Dense Object Detection},
-  author={Li, Xiang and Wang, Wenhai and Wu, Lijun and Chen, Shuo and Hu, Xiaolin and Li, Jun and Tang, Jinhui and Yang, Jian},
-  booktitle={NeurIPS},
-  year={2020}
+@article{li2020generalizedv2,
+    title={Generalized Focal Loss V2: Learning Reliable Localization Quality Estimation for Dense Object Detection},
+    author={Li, Xiang and Wang, Wenhai and Hu, Xiaolin and Li, Jun and Tang, Jinhui and Yang, Jian},
+    journal={arXiv preprint},
+    year={2020}
 }
-
 ```
